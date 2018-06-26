@@ -8,6 +8,9 @@
 	height:50px;
 }
 
+.hide-dot{
+	display: none;
+}
 .navbar-brand {
 	height: 60px;
 	padding: 5px 0px;

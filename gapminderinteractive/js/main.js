@@ -40,7 +40,10 @@ var color = [
 	'#a6dba0',
 	'#008837'
 ];
+
 var i = 1;
+var interval;
+var gdata;
 
 var tip = d3.tip().attr('class', 'd3-tip')
 	.html(function(d) {
@@ -145,18 +148,70 @@ var yearLabel = g.append("text")
 *			JSON			  *
 ******************************/
 d3.json("data/data.json").then(function(data) {
-	console.log(data[0]);
+	// console.log(data[0]);
+	gdata = data;
+	// Clean data
+	// const formattedData = data.map(function(year){
+	// 	return year["countries"].filter(function(country){
+	// 		var dataExists = (country.income && country.life_exp);
+	// 		return dataExists;
+	// 	}).map(function(country) {
+	// 		country.income = +country.income;
+	// 		country.life_exp = +country.life_exp;
+	// 		return country;
+	// 	})
+	// });
 
-	d3.interval(function(){
-		update(data[i]);
-		i++;
-	},100);
-	update(data[0]);
+	update(gdata[0]);
+	// console.log("formattedData[0]: " + formattedData[0]);
+
+	// d3.interval(function(){
+	// 	i = i < 214 ? i : 0;
+	// 	update(data[i]);
+	// 	i++;
+	// },200);
+
 
 }).catch(function(error){
 	console.log(error);
 });
 
+$("#play-button").on("click", function() {
+	var button = $(this);
+	if(button.text() == 'Play') {
+		button.text("Paus");
+		interval = setInterval(step, 100);
+	} else {
+		button.text('Play');
+		clearInterval(interval);
+	}
+});
+
+$("#reset-button").on("click", function() {
+	i = 1;
+	update(gdata[0]);
+});
+
+$("#continent-select").on("change", function() {
+	update(gdata[i]);
+});
+
+$("#date-slider").slider({
+	max: 2014,
+	min: 1800,
+	step: 1,
+	slide: function(event, ui){
+		i = ui.value - 1800;
+		update(gdata[i]);
+	}
+});
+
+function step() {
+	i = i < 214 ? i : 0;
+	// console.log(gdata);
+	update(gdata[i]);
+	i++;
+}
 
 
 /******************************
@@ -167,6 +222,19 @@ function update(data) {
 	data = data.countries;
 
 	var t = d3.transition(t).duration(90);
+
+
+	var continent = $("#continent-select").val();
+
+
+	console.log("continent: " + continent);
+	var data = data.filter(function(d) {
+		if (continent == "all") {
+			return true;
+		} else {
+			return d.continent == continent;
+		}
+	})
 
 	// console.log(year);
 
@@ -202,25 +270,28 @@ function update(data) {
 	circles.exit().remove();
 
 	// UPDATE old elements present in new data
-	circles
-		.attr("cy", (d) => { return y(d.life_exp); })
-		.attr("cx", (d) => { return x(d.income == null ? 340 : d.income); })
-		.attr("r", (d) => { return w(d.population); })
-		.attr("fill", (d) => { return z(d.continent); });
+	// circles
+	// 	.attr("cy", (d) => { return y(d.life_exp); })
+	// 	.attr("cx", (d) => { return x(d.income == null ? 340 : d.income); })
+	// 	.attr("r", (d) => { return w(d.population); })
+	// 	.attr("fill", (d) => { return z(d.continent); });
 
 	// ENTER new elements present in new data
+	// Allt efter Merge är det som kan komma att förändras.
 	circles.enter()
 			.append('circle')
 				.attr("fill", (d) => { return z(d.continent); })
 				.on("mouseover", tip.show)
 				.on('mouseout', tip.hide)
+				.merge(circles)
 				.transition(t)
-					.attr("cx", (d, i) => {
-						// console.log(x(d.income == null ? 340 : d.income));
-						return x(d.income == null ? 340 : d.income);
-					})
+					.attr("class", (d) => { return (d.income == null || d.life_exp == null) ? "hide-dot" : "show-dot" })
+					.attr("cx", (d, i) => { return x(d.income == null ? 340 : d.income); })
 					.attr("r", (d) => { return w(d.population); })
 					.attr("cy", (d) => { return y(d.life_exp); });
 
 	yearLabel.text(year);
+	$("#year")[0].innerHTML = year;
+
+	$("#date-slider").slider("value", +year)
 }
