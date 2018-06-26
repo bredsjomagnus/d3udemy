@@ -4,6 +4,10 @@
 *    Project 1 - Star Break Coffee
 */
 
+
+/******************************
+*	DIMENSIONS AND MARGINS	  *
+******************************/
 const widthinput = 600;
 const heightinput = 400;
 
@@ -24,64 +28,126 @@ var g = d3.select("#chart-area")
 		.append("g")
 			.attr("transform", "translate(" + margin.left + ", " + margin.top + ")");
 
+var flag = true;
+var t = d3.transition().duration(750);
+/******************************
+*			X-AXIS			  *
+******************************/
+// x-scale
+var x = d3.scaleBand()
+			.range([0, width])
+			.paddingInner(0.2)
+			.paddingOuter(0.2);
 
-// x-lable
+// x-axis
+var xAxisGroup = g.append("g")
+		.attr("transform", "translate(0, " + height + ")");
+
+// x-label
 g.append("text")
 	.attr("x", width/2)
 	.attr("y", height + 50)
 	.attr("text-anchor", "middle")
-	.text("MONTH")
+	.text("MONTH");
 
-// y-lable
-g.append("text")
+/******************************
+*			Y-AXIS			  *
+******************************/
+// y-scale
+var y = d3.scaleLinear()
+			.range([height, 0]);
+
+// y-axis
+var yAxisGroup = g.append("g");
+
+// y-label
+var yLabel = g.append("text")
 	.attr("x", - height/2)
 	.attr("y", - 60)
 	.attr("text-anchor", "middle")
 	.attr("transform", "rotate(-90)")
-	.text("REVENUE")
+	.text("REVENUE");
 
+
+/******************************
+*			JSON			  *
+******************************/
 d3.json("data/revenues.json").then(function(data) {
 	data.forEach((d) => { d.revenue = +d.revenue });
+	data.forEach((d) => { d.profit = +d.profit });
 	console.log(data);
 
-	// x-scale
-	var x = d3.scaleBand()
-				.domain(data.map((d) => { return d.month }))
-				.range([0, width])
-				.paddingInner(0.2)
-				.paddingOuter(0.2);
+	d3.interval(function(){
+		var newData = flag ? data : data.slice(1);
+		update(newData);
+		flag = !flag;
+	},1000);
 
-	// y-scale
-	var y = d3.scaleLinear()
-				.domain([ 0, d3.max(data, (d) => { return d.revenue }) ])
-				.range([height, 0]);
-
-	// x-axis
-	var xAxisCall = d3.axisBottom(x);
-	g.append("g")
-		.attr("transform", "translate(0, " + height + ")")
-		.call(xAxisCall);
-
-	var yAxisCall = d3.axisLeft(y);
-	g.append("g")
-		.call(yAxisCall);
-
-	var rects = g.selectAll('rect')
-					.data(data)
-					.enter()
-					.append('rect')
-						.attr("y", (d) => {
-							return y(d.revenue);
-						})
-						.attr("x", (d) => {
-							return x(d.month);
-						})
-						.attr("width", x.bandwidth)
-						.attr("height", (d) => {
-							return height - y(d.revenue);
-						})
-						.attr("fill", "gray")
+	update(data);
 
 }).catch(function(error){
 	console.log(error);
-})
+});
+
+// Lägg allt som behöver uppdateras här.
+function update(data) {
+	var value = flag ? "revenue" : "profit";
+
+	// Uppdatera domain
+	x.domain(data.map((d) => { return d.month }));
+	y.domain([ 0, d3.max(data, (d) => { return d[value] }) ]);
+
+	// Uppdatera x-axis beroende på nya skalan
+	var xAxisCall = d3.axisBottom(x);
+	xAxisGroup.transition(t).call(xAxisCall);
+
+	// Uppdatera y-axis beroende på nya skalan
+	var yAxisCall = d3.axisLeft(y);
+	yAxisGroup.transition(t).call(yAxisCall);
+
+
+	/************************************
+	*		UPDATE PATTERN				*
+	*	1. JOIN new data				*
+	*	2. EXIT oboslete elements		*
+	*	3. UPDATE existing elements		*
+	*	4. ENTER new elements	  		*
+	************************************/
+
+	// JOIN new data with old elements
+	var rects = g.selectAll('rect')
+					.data(data, function(d) {
+						return d.month;
+					});
+
+	// EXIT old elements not present in new data
+	rects.exit()
+		.attr("fill", "red")
+		.transition(t)
+			.attr("y", y(0))
+			.attr("height", 0)
+		.remove();
+
+	// UPDATE old elements present in new data
+	rects.transition(t)
+		.attr("y", (d) => { return y(d[value]); })
+		.attr("x", (d) => { return x(d.month); })
+		.attr("width", x.bandwidth)
+		.attr("height", (d) => { return height - y(d[value]); });
+
+	// ENTER new elements present in new data
+	rects.enter()
+			.append('rect')
+				.attr("x", (d) => { return x(d.month); })
+				.attr("width", x.bandwidth)
+				.attr("fill", "gray")
+				.attr("y", y(0))
+				.attr("height", 0)
+				.transition(t)
+					.attr("y", (d) => { return y(d[value]); })
+					.attr("height", (d) => { return height - y(d[value]); });
+
+	var label = flag ? "REVENUE" : "PROFIT";
+
+	yLabel.text(label);
+}
